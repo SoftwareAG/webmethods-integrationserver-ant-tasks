@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<antlib>
+	<taskdef name="activate-package" classname="com.softwareag.wx.is.ant.tasks.WmActivatePackage" />
+	<taskdef name="assign-acls" classname="com.softwareag.wx.is.ant.tasks.WmAssignAcls" />
+	<taskdef name="check-is-fixes" classname="com.softwareag.wx.is.ant.tasks.WmCheckInstalledFixes" />
+	<taskdef name="create-archive" classname="com.softwareag.wx.is.ant.tasks.WmCreatePackageArchive" />
+	<taskdef name="create-invoke-task" classname="com.softwareag.wx.is.ant.tasks.WmCreateServiceScript"/>
+	<taskdef name="delete-package" classname="com.softwareag.wx.is.ant.tasks.WmDeletePackage" />
+	<taskdef name="disable-package" classname="com.softwareag.wx.is.ant.tasks.WmDisablePackage" />
+	<taskdef name="enable-package" classname="com.softwareag.wx.is.ant.tasks.WmEnablePackage" />
+	<taskdef name="frag-local-package" classname="com.softwareag.wx.is.ant.tasks.WmFrag" />
+	<taskdef name="idata" classname="com.softwareag.wx.is.ant.tasks.WmIData" />
+	<taskdef name="install-package-from-archive" classname="com.softwareag.wx.is.ant.tasks.WmInstallPackageFromArchive" />
+	<taskdef name="property" classname="com.softwareag.wx.is.ant.tasks.WmProperty" />
+	<taskdef name="release-archive-to-server" classname="com.softwareag.wx.is.ant.tasks.WmReleaseArchiveToServer" />
+	<taskdef name="reload-package" classname="com.softwareag.wx.is.ant.tasks.WmReloadPackage" />
+	<taskdef name="service" classname="com.softwareag.wx.is.ant.tasks.WmServiceTask" />
+	<taskdef name="shutdown-server" classname="com.softwareag.wx.is.ant.tasks.WmShutdownServer" />
+	<taskdef name="sync-outofsync-doctypes" classname="com.softwareag.wx.is.ant.tasks.WmSyncDoctypes" />
+	<taskdef name="update-extended-settings" classname="com.softwareag.wx.is.ant.tasks.WmUpdateExtendedSettings" />
+	<taskdef name="variable" classname="com.softwareag.wx.is.ant.tasks.WmVariable" />
+	<taskdef name="wait-for-server" classname="com.softwareag.wx.is.ant.tasks.WmWaitForServer" />
+	
+	<!-- Conditions -->
+	<typedef name="is-server-available" classname="com.softwareag.wx.is.ant.tasks.WmServerAvailable" />
+	
+</antlib>

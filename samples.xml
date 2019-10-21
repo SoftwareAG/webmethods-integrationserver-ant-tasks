@@ -1,0 +1,687 @@
+<?xml version="1.0"?>
+<project name="Integration_Server_AntTasks_Samples" default="" basedir="." xmlns:wm-is="antlib:com.softwareag.wx.is.ant.tasks" >
+
+	<!-- Get connection parameters for local Integration Server with default settings -->
+	<property file="is-connection-default.properties" />
+
+	<path id="classpath.webMethods.client">
+		<fileset dir="${webMethods.home}/common/lib">
+			<!-- 
+			<include name="jcr/jackrabbit-jcr-rmi.jar" />
+			<include name="jcr/jcr.jar" />
+			<include name="ext/saaj-api.jar" />
+			<include name="wm-caf-server.jar" />
+			<include name="wm-caf-common.jar" />
+			<include name="wm-calendar.jar" />
+			<include name="wm-directory.jar" />
+			<include name="wm-directory-components.jar" />
+			<include name="wm-scg-core.jar" />
+			<include name="wm-scg-audit.jar" />
+			<include name="ext/commons-lang.jar" />
+			<include name="ext/commons-io.jar" />
+			<include name="ext/axis.jar" />
+			<include name="ext/commons-logging.jar" />
+			<include name="ext/commons-discovery.jar" />
+			<include name="ext/commons-collections.jar" /> 
+			<include name="wm-g11nutils.jar" />
+			<include name="ext/icu4j.jar" />
+			<include name="ext/enttoolkit.jar" />
+			<include name="ext/wsdl4j.jar" />
+			<include name="ext/log4j.jar" />
+			-->
+			
+			<include name="wm-brokerclient.jar" />
+			<include name="wm-isclient.jar" />
+			<include name="wm-jmsadmin.jar" />
+			<include name="wm-jmsclient.jar" />
+			<include name="wm-jmsnaming.jar" />
+			<include name="glassfish/gf.javax.jms.jar" />
+			<include name="glassfish/gf.javax.mail.jar" />
+		</fileset>
+	</path>
+
+
+	<path id="classpath.webMethods.server">
+		<fileset dir="${webMethods.home}/IntegrationServer/lib">
+			<include name="wm-isserver.jar" />
+			<include name="wm-isproxy.jar" />
+		</fileset>
+	</path>
+
+
+	<!-- CREATE TASK DEFINITIONS FOR webMethods TASKS -->
+	<taskdef uri="antlib:com.softwareag.wx.is.ant.tasks" resource="com/softwareag/wx/is/ant/tasks/wmAntTasksLib.xml">
+		<classpath>
+			<path refid="classpath.webMethods.client" />
+			<path refid="classpath.webMethods.server" />
+			<path>
+				<fileset dir=".">
+					<include name="build/wm-is-ant-tasks*.jar" />
+					<include name="jars/commons-jxpath-1.2.jar" />
+					<include name="jars/wmjxpath.jar" />
+					<include name="jars/serializer.jar" />
+				</fileset>
+			</path>
+		</classpath>
+	</taskdef>
+	
+	
+	<!-- TARGETS -->
+	<target name="check-is-started" description="Checks if the webMethods Integration Server is running">
+		<condition property="is.server.running">
+			<and>
+				<wm-is:is-server-available failWhenNotReachable="false" />
+			</and>
+		</condition>
+	</target>
+
+	<target name="start-is" description="Starts the webMethods Integration Server, if not running" depends="check-is-started" unless="is.server.running">
+		<parallel>
+			<daemons>
+				<exec executable="cmd">
+					<arg line="/c ${webMethods.home}/IntegrationServer/bin/server.bat" />
+				</exec>
+			</daemons>
+			<sequential>
+				<wm-is:wait-for-server numpings="10" intervalsec="30" timeoutProperty="wm.timeout" />
+				<fail if="wm.timeout" message="webMethods Integration Server failed to start." />
+				<echo message="webMethods Integration Server started." />
+			</sequential>
+		</parallel>
+	</target>
+
+	<target name="restart-is" description="Restarts the webMethods Integration Server">
+		<parallel>
+			<daemons>
+				<wm-is:shutdown-server restart="true" />
+			</daemons>
+			<sequential>
+				<sleep seconds="60" />
+				<wm-is:wait-for-server numpings="10" intervalsec="30" timeoutProperty="wm.timeout" />
+				<fail if="wm.timeout" message="webMethods Integration Server failed to restart." />
+				<echo message="webMethods Integration Server restarted." />
+			</sequential>
+		</parallel>
+	</target>
+
+	<target name="shutdown-is" description="Shuts down the webMethods Integration Server">
+		<parallel>
+			<daemons>
+				<wm-is:shutdown-server restart="false" />
+			</daemons>
+			<sequential>
+				<sleep seconds="60" />
+				<wm-is:wait-for-server numpings="5" intervalsec="10" timeoutProperty="wm.timeout" />
+				<fail unless="wm.timeout" message="webMethods Integration Server shutdown successfully." />
+			</sequential>
+		</parallel>
+	</target>
+
+	<!-- Package targets -->
+	<target name="package-reload">
+		<wm-is:reload-package package="${webMethods.package.name}" />
+	</target>
+
+	<target name="package-activate">
+		<wm-is:activate-package package="${webMethods.package.name}" />
+	</target>
+
+	<target name="package-enable">
+		<wm-is:enable-package package="${webMethods.package.name}" />
+	</target>
+
+	<target name="package-disable">
+		<wm-is:disable-package package="${webMethods.package.name}" />
+	</target>
+
+    <target name="package-install" description="Install package from archive sitting in ./replicate/inbound">
+    	<wm-is:install-package-from-archive archive="${webMethods.package.name}.zip" activateoninstall="true" ignoreerror="false" />
+    </target>
+
+
+	<!-- Trigger tasks -->
+	<target name="create-trigger">
+		<wm-is:service folder="pub.trigger" service="createTrigger">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="package" value="${package}" />
+				<wm-is:variable name="properties">
+					<wm-is:idata>
+						<wm-is:variable name="joinTimeOut" value="${joinTimeOut}" />
+						<wm-is:variable name="queueCapacity" value="${queueCapacity}" />
+						<wm-is:variable name="queueRefillLevel" value="${queueRefillLevel}" />
+						<wm-is:variable name="ackQueueSize" value="${ackQueueSize}" />
+						<wm-is:variable name="maxRetryAttempts" value="${maxRetryAttempts}" />
+						<wm-is:variable name="retryInterval" value="${retryInterval}" />
+						<wm-is:variable name="onRedeliveryFailure" value="${onRedeliveryFailure}" />
+						<wm-is:variable name="resumeTaskSvcName" value="${resumeTaskSvcName}" />
+						<wm-is:variable name="isPriorityEnabled" value="${isPriorityEnabled}" />
+						<wm-is:variable name="isConcurrent" value="${isConcurrent}" />
+						<wm-is:variable name="serialSuspendOnError" value="${serialSuspendOnError}" />
+						<wm-is:variable name="maxExecutionThreads" value="${maxExecutionThreads}" />
+						<wm-is:variable name="dupDetection" value="${dupDetection}" />
+						<wm-is:variable name="dupHistory" value="${dupHistory}" />
+						<wm-is:variable name="dupHistoryTTL" value="${dupHistoryTTL}" />
+						<wm-is:variable name="dupResolverSvcName" value="${dupResolverSvcName}" />
+					</wm-is:idata>
+				</wm-is:variable>
+				<wm-is:variable name="conditions" array="true">
+					<wm-is:idata>
+						<wm-is:variable name="conditionName" value="${conditionName}" />
+						<wm-is:variable name="serviceName" value="${serviceName}" />
+						<wm-is:variable name="joinType" value="${joinType}" />
+						<wm-is:variable name="messageTypeFilterPairs" array="true">
+							<wm-is:idata>
+								<wm-is:variable name="messageType" value="${messageType}" />
+								<wm-is:variable name="filter" value="${filter}" />
+							</wm-is:idata>
+						</wm-is:variable>
+					</wm-is:idata>
+				</wm-is:variable>
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="delete-trigger">
+		<wm-is:service folder="pub.trigger" service="deleteTrigger">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="suspend-trigger-processing">
+		<wm-is:service folder="pub.trigger" service="suspendProcessing">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="persistChange" value="${persistChange}" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="suspend-trigger-retrieval">
+		<wm-is:service folder="pub.trigger" service="suspendRetrieval">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="persistChange" value="${persistChange}" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="resume-trigger-processing">
+		<wm-is:service folder="pub.trigger" service="resumeProcessing">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="persistChange" value="${persistChange}" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="resume-trigger-retrieval">
+		<wm-is:service folder="pub.trigger" service="resumeRetrieval">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="persistChange" value="${persistChange}" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="create-jms-trigger">
+		<wm-is:service folder="pub.trigger" service="createJMSTrigger">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="package" value="${package}" />
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+				<wm-is:variable name="jmsTriggerType" value="${jmsTriggerType}" />
+				<wm-is:variable name="properties">
+					<wm-is:idata>
+						<wm-is:variable name="enabled" value="${enabled}" />
+						<wm-is:variable name="joinTimeOut" value="${joinTimeOut}" />
+						<wm-is:variable name="joinType" value="${joinType}" />
+						<wm-is:variable name="maxRetryAttempts" value="${maxRetryAttempts}" />
+						<wm-is:variable name="retryInterval" value="${retryInterval}" />
+						<wm-is:variable name="onTransientError" value="${onTransientError}" />
+						<wm-is:variable name="resumeTaskSvcName" value="${resumeTaskSvcName}" />
+						<wm-is:variable name="isConcurrent" value="${isConcurrent}" />
+						<wm-is:variable name="suspendOnError" value="${suspendOnError}" />
+						<wm-is:variable name="maxExecutionThreads" value="${maxExecutionThreads}" />
+						<wm-is:variable name="maxBatchSize" value="${maxBatchSize}" />
+						<wm-is:variable name="dupDetection" value="${dupDetection}" />
+						<wm-is:variable name="dupHistory" value="${dupHistory}" />
+						<wm-is:variable name="dupHistoryTTL" value="${dupHistoryTTL}" />
+						<wm-is:variable name="dupResolverSvcName" value="${dupResolverSvcName}" />
+						<wm-is:variable name="prefetchSize" value="${prefetchSize}" />
+						<wm-is:variable name="acknowledgeMode" value="${acknowledgeMode}" />
+						<wm-is:variable name="executeUser" value="${executeUser}" />
+					</wm-is:idata>
+				</wm-is:variable>
+				<wm-is:variable name="destinations" array="true">
+					<wm-is:idata>
+						<wm-is:variable name="destination" value="${destination}" />
+						<wm-is:variable name="destinationType" value="${destinationType}" />
+						<wm-is:variable name="messageSelector" value="${messageSelector}" />
+						<wm-is:variable name="durableSubscriberName" value="${durableSubscriberName}" />
+						<wm-is:variable name="durableSubscriberNoLocal" value="${durableSubscriberNoLocal}" />
+					</wm-is:idata>
+				</wm-is:variable>
+				<wm-is:variable name="routingRules" array="true">
+					<wm-is:idata>
+						<wm-is:variable name="ruleName" value="${ruleName}" />
+						<wm-is:variable name="serviceName" value="${serviceName}" />
+						<wm-is:variable name="filter" value="${filter}" />
+					</wm-is:idata>
+				</wm-is:variable>
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="delete-jms-trigger">
+		<wm-is:service folder="pub.trigger" service="deleteJMSTrigger">
+			<wm-is:idata>
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="disable-jms-triggers">
+		<wm-is:service folder="pub.trigger" service="disableJMSTriggers">
+			<wm-is:idata>
+				<wm-is:variable name="triggerNameList" value="${triggerNameList}" array="true" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="enable-jms-triggers">
+		<wm-is:service folder="pub.trigger" service="enableJMSTriggers">
+			<wm-is:idata>
+				<wm-is:variable name="triggerNameList" value="${triggerNameList}" array="true" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="suspend-jms-triggers">
+		<wm-is:service folder="pub.trigger" service="suspendJMSTriggers">
+			<wm-is:idata>
+				<wm-is:variable name="triggerNameList" value="${triggerNameList}" array="true" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="${applyChangeAcrossCluster}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="suspend-all-triggers">
+		<wm-is:service folder="wm.server.admin" service="setTriggerThrottleControlSettings">
+			<wm-is:idata>
+				<wm-is:variable name="maximumTriggerExecutionThreadsPct" value="0" />
+				<wm-is:variable name="maximumDocumentRetrievalThreadsPct" value="0" />
+				<wm-is:variable name="triggerExecutionThreadsThrottle" value="0" />
+				<wm-is:variable name="triggerDocumentStoreThrottle" value="0" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="true" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="resume-all-triggers">
+		<wm-is:service folder="wm.server.admin" service="setTriggerThrottleControlSettings">
+			<wm-is:idata>
+				<wm-is:variable name="maximumTriggerExecutionThreadsPct" value="100" />
+				<wm-is:variable name="maximumDocumentRetrievalThreadsPct" value="100" />
+				<wm-is:variable name="triggerExecutionThreadsThrottle" value="100" />
+				<wm-is:variable name="triggerDocumentStoreThrottle" value="100" />
+				<wm-is:variable name="applyChangeAcrossCluster" value="true" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<!-- Sync docTypes tasks -->
+	<target name="sync-doctypes-to-broker">
+		<wm-is:service folder="pub.publish" service="syncToBroker">
+			<wm-is:idata>
+				<wm-is:variable name="documentTypes" value="${documentTypes}" array="true" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="sync-outofsync-doctypes">
+		<wm-is:sync-outofsync-doctypes />
+	</target>
+
+	<!-- JMS targets -->
+	<target name="create-jms-connection-alias">
+		<wm-is:service folder="wm.server.jms" service="createConnectionAlias">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+				<wm-is:variable name="description" value="${description}" />
+				<wm-is:variable name="clientID" value="${clientID}" />
+				<wm-is:variable name="transactionType" value="${transactionType}" />
+				<wm-is:variable name="associationType" value="${associationType}" />
+				<wm-is:variable name="csqSize" value="${csqSize}" />
+				<wm-is:variable name="csqDrainInOrder" value="${csqDrainInOrder}" />
+				<wm-is:variable name="jndi_jndiAliasName" value="${jndi_jndiAliasName}" />
+				<wm-is:variable name="jndi_connectionFactoryLookupName" value="${jndi_connectionFactoryLookupName}" />
+				<wm-is:variable name="nwm_brokerHost" value="${nwm_brokerHost}" />
+				<wm-is:variable name="nwm_brokerName" value="${nwm_brokerName}" />
+				<wm-is:variable name="nwm_brokerList" value="${nwm_brokerList}" />
+				<wm-is:variable name="nwm_clientGroup" value="${nwm_clientGroup}" />
+				<wm-is:variable name="nwm_keystore" value="${nwm_keystore}" />
+				<wm-is:variable name="nwm_encrypted" value="${nwm_encrypted}" />
+				<wm-is:variable name="nwm_sharedState" value="${nwm_sharedState}" />
+				<wm-is:variable name="nwm_sharedStateOrder" value="${nwm_sharedStateOrder}" />
+				<wm-is:variable name="nwm_clientGroup" value="${nwm_clientGroup}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="delete-jms-connection-alias">
+		<wm-is:service folder="wm.server.jms" service="deleteConnectionAlias">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="disable-jms-connection-alias">
+		<wm-is:service folder="wm.server.jms" service="disableConnectionAlias">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="enable-jms-connection-alias">
+		<wm-is:service folder="wm.server.jms" service="enableConnectionAlias">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="create-queue">
+		<wm-is:service folder="wm.server.jms" service="createQueue">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+				<wm-is:variable name="triggerName" value="${triggerName}" />
+				<wm-is:variable name="key" value="${key}" />
+				<wm-is:variable name="queueName" value="${queueName}" />
+				<wm-is:variable name="sharedState" value="${sharedState}" />
+				<wm-is:variable name="sharedStateOrdering" value="${sharedStateOrdering}" />
+				<wm-is:variable name="priorityOrdering" value="${priorityOrdering}" />
+				<wm-is:variable name="override" value="${override}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="create-topic">
+		<wm-is:service folder="wm.server.jms" service="createTopic">
+			<wm-is:idata>
+				<wm-is:variable name="aliasName" value="${aliasName}" />
+				<wm-is:variable name="key" value="${key}" />
+				<wm-is:variable name="topicName" value="${topicName}" />
+				<wm-is:variable name="override" value="${override}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<!-- Config related targets -->
+	<target name="set-broker-config">
+		<wm-is:service folder="wm.server.dispatcher.adminui" service="setBrokerSettings">
+			<wm-is:idata>
+				<wm-is:variable name="brokerHost" value="${brokerHost}" />
+				<wm-is:variable name="brokerName" value="${brokerName}" />
+				<wm-is:variable name="clientGroupName" value="${clientGroupName}" />
+				<wm-is:variable name="CLIENTPREFIX" value="${CLIENTPREFIX}" />
+				<wm-is:variable name="BROKERCONFIGURATION" value="${isConfigured}" />
+				<wm-is:variable name="useSSL" value="${useSSL}" />
+				<wm-is:variable name="certfile" value="${certfile}" />
+				<wm-is:variable name="certfileType" value="${certfileType}" />
+				<wm-is:variable name="truststore" value="${truststore}" />
+				<wm-is:variable name="truststoreType" value="${truststoreType}" />
+				<wm-is:variable name="password" value="${password}" />
+				<wm-is:variable name="dname" value="${dname}" />
+				<wm-is:variable name="isEncrypted" value="${isEncrypted}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="set-cluster-config">
+		<wm-is:service folder="wm.server.cluster" service="setSettings">
+			<wm-is:idata>
+				<wm-is:variable name="clusterAware" value="${clusterAware}" />
+				<wm-is:variable name="clusterSessTimeout" value="${clusterSessTimeout}" />
+				<wm-is:variable name="clusterName" value="${clusterName}" />
+				<wm-is:variable name="dataPort" value="${dataPort}" />
+				<wm-is:variable name="discoveryAddress" value="${discoveryAddress}" />
+				<wm-is:variable name="discoveryPort" value="${discoveryPort}" />
+				<wm-is:variable name="timeToLive" value="${timeToLive}" />
+				<wm-is:variable name="members" array="true">
+					<wm-is:idata>
+						<wm-is:variable name="host" value="${host}" />
+						<wm-is:variable name="port" value="${port}" />
+					</wm-is:idata>
+				</wm-is:variable>
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="set-monitor-config">
+		<wm-is:service folder="wm.monitor.util" service="configSettings">
+			<wm-is:idata>
+				<wm-is:variable name="myWebmethodsHost" value="${myWebmethodsHost}" />
+				<wm-is:variable name="myWebmethodsPort" value="${myWebmethodsPort}" />
+				<wm-is:variable name="myWebmethodsTransport" value="${myWebmethodsTransport}" />
+				<wm-is:variable name="myWebmethodsUserName" value="${myWebmethodsUserName}" />
+				<wm-is:variable name="myWebmethodsPassword" value="${myWebmethodsPassword}" />
+				<wm-is:variable name="edit" value="${edit}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<target name="set-taskclient-config">
+		<wm-is:service folder="wm.task.taskclient" service="setConfig">
+			<wm-is:idata>
+				<wm-is:variable name="taskclienturl" value="${taskclienturl}" />
+				<wm-is:variable name="taskclientuser" value="${taskclientuser}" />
+				<wm-is:variable name="taskclientpassword" value="${taskclientpassword}" />
+				<wm-is:variable name="taskclienttimeout" value="${taskclienttimeout}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<target name="set-optimize-config">
+		<wm-is:service folder="wm.optimize.configuration.ConfigurationService" service="saveConfiguration">
+			<wm-is:idata>
+				<wm-is:variable name="wm.wmoptimize.ae.host" value="${wm.wmoptimize.ae.host}" />
+				<wm-is:variable name="wm.wmoptimize.ae.port" value="${wm.wmoptimize.ae.port}" />
+				<wm-is:variable name="wm.wmoptimize.ae.user" value="${wm.wmoptimize.ae.user}" />
+				<wm-is:variable name="wm.wmoptimize.ae.password" value="${wm.wmoptimize.ae.password}" />
+				<wm-is:variable name="wm.wmoptimize.brokerURL" value="${wm.wmoptimize.brokerURL}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- WmART tasks -->
+	<target name="enable-art-connection">
+		<wm-is:service folder="pub.art.connection" service="enableConnection">
+			<wm-is:idata>
+				<wm-is:variable name="connectionAlias" value="${connectionAlias}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="disable-art-connection">
+		<wm-is:service folder="pub.art.connection" service="disableConnection">
+			<wm-is:idata>
+				<wm-is:variable name="connectionAlias" value="${connectionAlias}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="enable-art-listener">
+		<wm-is:service folder="pub.art.listener" service="enableListener">
+			<wm-is:idata>
+				<wm-is:variable name="listenerName" value="${listenerName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="disable-art-listener">
+		<wm-is:service folder="pub.art.listener" service="disableListener">
+			<wm-is:idata>
+				<wm-is:variable name="listenerName" value="${listenerName}" />
+				<wm-is:variable name="forceDisable" value="${forceDisable}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="suspend-art-listener">
+		<wm-is:service folder="pub.art.listener" service="suspendListener">
+			<wm-is:idata>
+				<wm-is:variable name="listenerName" value="${listenerName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+
+	<target name="resume-art-listener">
+		<wm-is:service folder="pub.art.listener" service="resumeListener">
+			<wm-is:idata>
+				<wm-is:variable name="listenerName" value="${listenerName}" />
+			</wm-is:idata>
+		</wm-is:service>
+	</target>
+	
+	<!-- IS Resources & Extended Settings -->
+	<target name="set-is-resources">
+		<wm-is:service folder="wm.server.admin" service="setSettings">			
+			<wm-is:idata propertiesFile="${propertiesFile}"/>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- JDBC Pools -->
+	<target name="add-update-jdbcpool">
+		<input message="Please input password for ${pool}:" addproperty="pwd" />
+		<wm-is:service folder="wm.server.jdbcpool" service="addPoolAlias">
+			<wm-is:idata>
+				<wm-is:variable name="pool" value="${pool}" />
+				<wm-is:variable name="description" value="${description}" />
+				<wm-is:variable name="drivers" value="${drivers}" />
+				<wm-is:variable name="url" value="${url}" />
+				<wm-is:variable name="uid" value="${uid}" />
+				<wm-is:variable name="pwd" value="${pwd}" />
+				<wm-is:variable name="idle" value="${idle}" />
+				<wm-is:variable name="mincon" value="${mincon}" />
+				<wm-is:variable name="maxcon" value="${maxcon}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>			
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- JDBC Pools Functional Alias -->
+	<target name="update-jdbcpool-func-alias">
+		<wm-is:service folder="wm.server.jdbcpool" service="updateFunctionalAlias">
+			<wm-is:idata>
+				<wm-is:variable name="function" value="${function}" />
+				<wm-is:variable name="function.pool" value="${function.pool}" />				
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- WmPRT -->
+	<target name="set-wmprt-config">
+		<wm-is:service folder="wm.prt.admin" service="configSettings">
+			<wm-is:idata>
+				<wm-is:variable name="brokerURL" value="${brokerURL}" />
+				<wm-is:variable name="edit" value="${edit}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- Create Key and Trust Stores -->
+	<target name="create-key-trust-store">
+		<wm-is:service folder="wm.server.security.keystore" service="createStore">
+			<wm-is:idata>
+				<wm-is:variable name="mode" value="${mode}" />
+				<wm-is:variable name="keyStoreName" value="${keyStoreName}" />
+				<wm-is:variable name="keyStoreDescription" value="${keyStoreDescription}" />
+				<wm-is:variable name="keyStoreType" value="${keyStoreType}" />
+				<wm-is:variable name="keyStoreProvider" value="${keyStoreProvider}" />
+				<wm-is:variable name="keyStoreLocation" value="${keyStoreLocation}" />
+				<wm-is:variable name="keyStorePassword" value="${keyStorePassword}" />
+				<wm-is:variable name="keyStorePasswordChanged" value="${keyStorePasswordChanged}" />
+				<wm-is:variable name="pkAliases" value="${pkAliases}" />
+				<wm-is:variable name="pkPasswords" value="${pkPasswords}" />
+				<wm-is:variable name="bitarray" value="${bitarray}" />
+				<wm-is:variable name="type" value="${type}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+	<!-- Create Listener Port -->
+	<target name="create-listener-port">
+		<wm-is:service folder="wm.server.net.listeners" service="ListenerAdmin">
+			<wm-is:idata>
+				<wm-is:variable name="pkg" value="${pkg}" />
+				<wm-is:variable name="factoryKey" value="${factoryKey}" />
+				<wm-is:variable name="operation" value="${operation}" />
+				<wm-is:variable name="listenerType" value="${listenerType}" />
+				<wm-is:variable name="mode" value="${mode}" />
+				<wm-is:variable name="port" value="${port}" />
+				<wm-is:variable name="bindAddress" value="${bindAddress}" />
+				<wm-is:variable name="type" value="${type}" />
+				<wm-is:variable name="enable" value="${enable}" />
+				<wm-is:variable name="ssl" value="${ssl}" />
+				<wm-is:variable name="maxQueue" value="${maxQueue}" />
+				<wm-is:variable name="keepAliveTimeout" value="${keepAliveTimeout}" />
+				<wm-is:variable name="clientAuth" value="${clientAuth}" />
+				<wm-is:variable name="keyStore" value="${keyStore}" />
+				<wm-is:variable name="alias" value="${alias}" />
+				<wm-is:variable name="trustStore" value="${trustStore}" />
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+	
+	<!-- WmJDBCAdapter Update Password -->
+	<target name="update_jdbcconnection_password">
+		<input message="Please input old password for ${connectionAlias}:" addproperty="oldPassword">
+			<handler classname="org.apache.tools.ant.input.SecureInputHandler" />
+		</input>
+		<input message="Please input new password for ${connectionAlias}:" addproperty="newPassword">
+			<handler classname="org.apache.tools.ant.input.SecureInputHandler" />
+		</input>
+		<input message="Please confirm new password for ${connectionAlias}:" addproperty="confirmNewPassword">
+			<handler classname="org.apache.tools.ant.input.SecureInputHandler" />
+		</input>
+		<wm-is:service folder="pub.jdbcAdapter" service="updateConnectionPassword">
+			<wm-is:idata>
+				<wm-is:variable name="connectionAlias" value="${connectionAlias}" />
+				<wm-is:variable name="oldPassword" value="${oldPassword}" />
+				<wm-is:variable name="newPassword" value="${newPassword}" />
+				<wm-is:variable name="confirmNewPassword" value="${confirmNewPassword}" />				
+			</wm-is:idata>
+			<wm-is:property name="message" xpath="/message | /msg | /status"/>
+		</wm-is:service>
+		<echo message="${message}"/>
+	</target>
+
+</project>
