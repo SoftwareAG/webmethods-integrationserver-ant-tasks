@@ -78,8 +78,11 @@
 	<target name="start-is" description="Starts the webMethods Integration Server, if not running" depends="check-is-started" unless="is.server.running">
 		<parallel>
 			<daemons>
-				<exec executable="cmd">
+				<exec executable="cmd" osfamily="winnt">
 					<arg line="/c ${webMethods.home}/IntegrationServer/bin/server.bat" />
+				</exec>
+				<exec executable="cmd" osfamily="unix">
+					<arg line="/c ${webMethods.home}/IntegrationServer/bin/server.sh" />
 				</exec>
 			</daemons>
 			<sequential>
